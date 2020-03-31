@@ -1,0 +1,18 @@
+[package]
+name = "static-iref"
+version = "1.0.0"
+authors = ["Timothée Haudebourg <author@haudebourg.net>"]
+edition = "2018"
+categories = ["web-programming", "internationalization"]
+keywords = ["iri", "iref", "macro", "static"]
+description = "Build static IRI and IRI references at compile time"
+repository = "https://github.com/timothee-haudebourg/static-iref"
+documentation = "https://docs.rs/static-iref"
+license = "MIT/Apache-2.0"
+readme = "README.md"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+iref = "1.1"
