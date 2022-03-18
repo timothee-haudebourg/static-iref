@@ -16,5 +16,8 @@ fn iri_ref() {
 
 #[test]
 fn iri() {
-	assert_eq!(IRI, Iri::new("https://www.rust-lang.org/foo/bar#frag").unwrap());
+	assert_eq!(
+		IRI,
+		Iri::new("https://www.rust-lang.org/foo/bar#frag").unwrap()
+	);
 }
