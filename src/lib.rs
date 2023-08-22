@@ -1,122 +1,66 @@
-//! This is a companion crate for `iref` providing two macros to build `'static`
-//! IRIs and IRI references at compile time.
+//! This is a companion crate for [`iref`][iref] providing macros to build
+//! `'static` URI/IRIs and URI/IRI references at compile time.
+//!
+//! [iref]: <https://github.com/timothee-haudebourg/iref>
 //!
 //! ## Basic usage
 //!
-//! Use the `iri!` macro to build IRI statically, and the `iref!` macro to build
-//! IRI references statically.
+//! Use the `uri!` (resp. `iri!`) macro to build URI (resp. IRI) statically, and
+//! the `uri_ref!` (resp `iri_ref!`) macro to build URI (resp. IRI) references
+//! statically.
 //!
 //! ```rust
-//! extern crate iref;
-//! #[macro_use]
-//! extern crate static_iref;
-//!
 //! use iref::{Iri, IriRef};
+//! use static_iref::{iri, iri_ref};
 //!
-//! const IRI: Iri<'static> = iri!("https://www.rust-lang.org/foo/bar#frag");
-//! const IREF: IriRef<'static> = iref!("/foo/bar#frag");
+//! const IRI: &'static Iri = iri!("https://www.rust-lang.org/foo/bar#frag");
+//! const IRI_REF: &'static IriRef = iri_ref!("/foo/bar#frag");
 //! ```
+use iref::{IriBuf, IriRefBuf, UriBuf, UriRefBuf};
+use proc_macro::TokenStream;
+use quote::quote;
 
-extern crate iref;
-extern crate proc_macro;
-
-use iref::{Iri, IriRef};
-use proc_macro::{TokenStream, TokenTree};
-use std::fmt;
-
-struct Optional<T>(Option<T>);
-
-impl<T: fmt::Display> fmt::Display for Optional<T> {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match &self.0 {
-			Some(t) => write!(f, "Some({})", t),
-			None => write!(f, "None"),
-		}
-	}
-}
-
-fn string_literal(tokens: TokenStream) -> Result<String, &'static str> {
-	if let Some(token) = tokens.into_iter().next() {
-		if let TokenTree::Literal(lit) = token {
-			let str = lit.to_string();
-
-			if str.len() >= 2 {
-				let mut buffer = String::with_capacity(str.len() - 2);
-				for (i, c) in str.chars().enumerate() {
-					if i == 0 || i == str.len() - 1 {
-						if c != '"' {
-							return Err("expected string literal");
-						}
-					} else {
-						buffer.push(c)
+/// Build an URI with a `'static` lifetime at compile time.
+///
+/// This macro expects a single string literal token representing the URI.
+#[proc_macro]
+pub fn uri(tokens: TokenStream) -> TokenStream {
+	match syn::parse::<syn::LitStr>(tokens) {
+		Ok(lit) => match UriBuf::new(lit.value().into_bytes()) {
+			Ok(uri) => {
+				let value = uri.as_bytes();
+				quote! {
+					unsafe {
+						::iref::Uri::new_unchecked(&[#(#value),*])
 					}
 				}
-
-				Ok(buffer)
-			} else {
-				Err("expected string literal")
+				.into()
 			}
-		} else {
-			Err("expected string literal")
-		}
-	} else {
-		Err("expected one string parameter")
+			Err(_) => produce_error("invalid URI"),
+		},
+		Err(e) => e.to_compile_error().into(),
 	}
 }
 
-fn stringify_authority_parsing_data(p: Option<iref::parsing::ParsedAuthority>) -> String {
-	match p {
-		Some(p) => {
-			format!(
-				"Some(::iref::parsing::ParsedAuthority {{
-	userinfo_len: {},
-	host_len: {},
-	port_len: {}
-}})
-",
-				Optional(p.userinfo_len),
-				p.host_len,
-				Optional(p.port_len)
-			)
-		}
-		None => "None".to_string(),
-	}
-}
-
-fn stringify_parsing_data(p: iref::parsing::ParsedIriRef) -> String {
-	format!(
-		"::iref::parsing::ParsedIriRef {{
-	scheme_len: {},
-	authority: {},
-	path_len: {},
-	query_len: {},
-	fragment_len: {}
-}}",
-		Optional(p.scheme_len),
-		stringify_authority_parsing_data(p.authority),
-		p.path_len,
-		Optional(p.query_len),
-		Optional(p.fragment_len)
-	)
-}
-
-/// Build an IRI reference with a `'static` lifetime at compile time.
+/// Build an URI reference with a `'static` lifetime at compile time.
 ///
-/// This macro expects a single string literal token representing the IRI reference.
+/// This macro expects a single string literal token representing the URI reference.
 #[proc_macro]
-pub fn iref(tokens: TokenStream) -> TokenStream {
-	match string_literal(tokens) {
-		Ok(str) => {
-			if let Ok(iri_ref) = IriRef::new(str.as_str()) {
-				let p = stringify_parsing_data(iri_ref.parsing_data());
-				format!("unsafe{{::iref::IriRef::from_raw(b\"{}\", {})}}", str, p)
-					.parse()
-					.unwrap()
-			} else {
-				produce_error("invalid IRI reference")
+pub fn uri_ref(tokens: TokenStream) -> TokenStream {
+	match syn::parse::<syn::LitStr>(tokens) {
+		Ok(lit) => match UriRefBuf::new(lit.value().into_bytes()) {
+			Ok(uri_ref) => {
+				let value = uri_ref.as_bytes();
+				quote! {
+					unsafe {
+						::iref::UriRef::new_unchecked(&[#(#value),*])
+					}
+				}
+				.into()
 			}
-		}
-		Err(msg) => produce_error(msg),
+			Err(_) => produce_error("invalid URI reference"),
+		},
+		Err(e) => e.to_compile_error().into(),
 	}
 }
 
@@ -125,21 +69,42 @@ pub fn iref(tokens: TokenStream) -> TokenStream {
 /// This macro expects a single string literal token representing the IRI.
 #[proc_macro]
 pub fn iri(tokens: TokenStream) -> TokenStream {
-	match string_literal(tokens) {
-		Ok(str) => {
-			if let Ok(iri) = Iri::new(str.as_str()) {
-				let p = stringify_parsing_data(iri.as_iri_ref().parsing_data());
-				format!(
-					"::iref::Iri::from_iri_ref(unsafe{{::iref::IriRef::from_raw(b\"{}\", {})}})",
-					str, p
-				)
-				.parse()
-				.unwrap()
-			} else {
-				produce_error("invalid IRI")
+	match syn::parse::<syn::LitStr>(tokens) {
+		Ok(lit) => match IriBuf::new(lit.value()) {
+			Ok(iri) => {
+				let value = iri.as_str();
+				quote! {
+					unsafe {
+						::iref::Iri::new_unchecked(#value)
+					}
+				}
+				.into()
 			}
-		}
-		Err(msg) => produce_error(msg),
+			Err(_) => produce_error("invalid IRI"),
+		},
+		Err(e) => e.to_compile_error().into(),
+	}
+}
+
+/// Build an IRI reference with a `'static` lifetime at compile time.
+///
+/// This macro expects a single string literal token representing the IRI reference.
+#[proc_macro]
+pub fn iri_ref(tokens: TokenStream) -> TokenStream {
+	match syn::parse::<syn::LitStr>(tokens) {
+		Ok(lit) => match IriRefBuf::new(lit.value()) {
+			Ok(iri_ref) => {
+				let value = iri_ref.as_str();
+				quote! {
+					unsafe {
+						::iref::IriRef::new_unchecked(#value)
+					}
+				}
+				.into()
+			}
+			Err(_) => produce_error("invalid IRI reference"),
+		},
+		Err(e) => e.to_compile_error().into(),
 	}
 }
 
