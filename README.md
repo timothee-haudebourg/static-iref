@@ -1,29 +1,31 @@
 # Build IRI and IRI references at compile time
 
-<table><tr>
-	<td><a href="https://docs.rs/static-iref">Documentation</a></td>
-	<td><a href="https://crates.io/crates/static-iref">Crate informations</a></td>
-	<td><a href="https://github.com/timothee-haudebourg/static-iref">Repository</a></td>
-</tr></table>
+[![Crate informations](https://img.shields.io/crates/v/iref.svg?style=flat-square)](https://crates.io/crates/iref)
+[![License](https://img.shields.io/crates/l/iref.svg?style=flat-square)](https://github.com/timothee-haudebourg/iref#license)
+[![Documentation](https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square)](https://docs.rs/iref)
 
-This is a companion crate for `iref` providing two macros to build `'static`
-IRIs and IRI references at compile time.
+<!-- cargo-rdme start -->
 
-## Basic usage
+This is a companion crate for [`iref`][iref] providing macros to build
+`'static` URI/IRIs and URI/IRI references at compile time.
 
-Use the `iri!` macro to build IRI statically, and the `iref!` macro to build
-IRI references statically.
+[iref]: <https://github.com/timothee-haudebourg/iref>
+
+### Basic usage
+
+Use the `uri!` (resp. `iri!`) macro to build URI (resp. IRI) statically, and
+the `uri_ref!` (resp `iri_ref!`) macro to build URI (resp. IRI) references
+statically.
 
 ```rust
-extern crate iref;
-#[macro_use]
-extern crate static_iref;
-
 use iref::{Iri, IriRef};
+use static_iref::{iri, iri_ref};
 
-const IRI: Iri<'static> = iri!("https://www.rust-lang.org/foo/bar#frag");
-const IREF: IriRef<'static> = iref!("/foo/bar#frag");
+const IRI: &'static Iri = iri!("https://www.rust-lang.org/foo/bar#frag");
+const IRI_REF: &'static IriRef = iri_ref!("/foo/bar#frag");
 ```
+
+<!-- cargo-rdme end -->
 
 ## License
 
